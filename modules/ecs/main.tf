@@ -82,10 +82,10 @@ resource "random_id" "target_group_sufix" {
 }
 
 resource "aws_alb_target_group" "alb_target_group" {
-  name     = "${var.environment}-alb-target-group-${random_id.target_group_sufix.hex}"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = "${var.vpc_id}"
+  name        = "${var.environment}-alb-target-group-${random_id.target_group_sufix.hex}"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = "${var.vpc_id}"
   target_type = "ip"
 
   lifecycle {
@@ -153,10 +153,11 @@ resource "aws_alb_listener" "openjobs" {
 */
 data "aws_iam_policy_document" "ecs_service_role" {
   statement {
-    effect = "Allow"
+    effect  = "Allow"
     actions = ["sts:AssumeRole"]
+
     principals {
-      type = "Service"
+      type        = "Service"
       identifiers = ["ecs.amazonaws.com"]
     }
   }
@@ -169,21 +170,23 @@ resource "aws_iam_role" "ecs_role" {
 
 data "aws_iam_policy_document" "ecs_service_policy" {
   statement {
-    effect = "Allow"
+    effect    = "Allow"
     resources = ["*"]
+
     actions = [
       "elasticloadbalancing:Describe*",
       "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
       "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
       "ec2:Describe*",
-      "ec2:AuthorizeSecurityGroupIngress"
+      "ec2:AuthorizeSecurityGroupIngress",
     ]
   }
 }
 
 /* ecs service scheduler role */
 resource "aws_iam_role_policy" "ecs_service_role_policy" {
-  name   = "ecs_service_role_policy"
+  name = "ecs_service_role_policy"
+
   #policy = "${file("${path.module}/policies/ecs-service-role.json")}"
   policy = "${data.aws_iam_policy_document.ecs_service_policy.json}"
   role   = "${aws_iam_role.ecs_role.id}"
@@ -194,6 +197,7 @@ resource "aws_iam_role" "ecs_execution_role" {
   name               = "ecs_task_execution_role"
   assume_role_policy = "${file("${path.module}/policies/ecs-task-execution-role.json")}"
 }
+
 resource "aws_iam_role_policy" "ecs_execution_role_policy" {
   name   = "ecs_execution_role_policy"
   policy = "${file("${path.module}/policies/ecs-execution-role-policy.json")}"
@@ -232,6 +236,7 @@ resource "aws_security_group" "ecs_service" {
 
 /* Simply specify the family to find the latest ACTIVE revision in that family */
 data "aws_ecs_task_definition" "web" {
+  depends_on      = ["aws_ecs_task_definition.web"]
   task_definition = "${aws_ecs_task_definition.web.family}"
 }
 
@@ -240,8 +245,8 @@ resource "aws_ecs_service" "web" {
   task_definition = "${aws_ecs_task_definition.web.family}:${max("${aws_ecs_task_definition.web.revision}", "${data.aws_ecs_task_definition.web.revision}")}"
   desired_count   = 2
   launch_type     = "FARGATE"
-  cluster =       "${aws_ecs_cluster.cluster.id}"
-  depends_on      = ["aws_iam_role_policy.ecs_service_role_policy"]
+  cluster         = "${aws_ecs_cluster.cluster.id}"
+  depends_on      = ["aws_iam_role_policy.ecs_service_role_policy", "aws_ecs_task_definition.web"]
 
   network_configuration {
     security_groups = ["${var.security_groups_ids}", "${aws_security_group.ecs_service.id}"]
@@ -257,7 +262,6 @@ resource "aws_ecs_service" "web" {
   depends_on = ["aws_alb_target_group.alb_target_group"]
 }
 
-
 /*====
 Auto Scaling for ECS
 ======*/
@@ -266,6 +270,7 @@ resource "aws_iam_role" "ecs_autoscale_role" {
   name               = "${var.environment}_ecs_autoscale_role"
   assume_role_policy = "${file("${path.module}/policies/ecs-autoscale-role.json")}"
 }
+
 resource "aws_iam_role_policy" "ecs_autoscale_role_policy" {
   name   = "ecs_autoscale_role_policy"
   policy = "${file("${path.module}/policies/ecs-autoscale-role-policy.json")}"
@@ -282,11 +287,10 @@ resource "aws_appautoscaling_target" "target" {
 }
 
 resource "aws_appautoscaling_policy" "up" {
-  name                    = "${var.environment}_scale_up"
-  service_namespace       = "ecs"
-  resource_id             = "service/${aws_ecs_cluster.cluster.name}/${aws_ecs_service.web.name}"
-  scalable_dimension      = "ecs:service:DesiredCount"
-
+  name               = "${var.environment}_scale_up"
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.cluster.name}/${aws_ecs_service.web.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
 
   step_scaling_policy_configuration {
     adjustment_type         = "ChangeInCapacity"
@@ -295,7 +299,7 @@ resource "aws_appautoscaling_policy" "up" {
 
     step_adjustment {
       metric_interval_lower_bound = 0
-      scaling_adjustment = 1
+      scaling_adjustment          = 1
     }
   }
 
@@ -303,10 +307,10 @@ resource "aws_appautoscaling_policy" "up" {
 }
 
 resource "aws_appautoscaling_policy" "down" {
-  name                    = "${var.environment}_scale_down"
-  service_namespace       = "ecs"
-  resource_id             = "service/${aws_ecs_cluster.cluster.name}/${aws_ecs_service.web.name}"
-  scalable_dimension      = "ecs:service:DesiredCount"
+  name               = "${var.environment}_scale_down"
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.cluster.name}/${aws_ecs_service.web.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
 
   step_scaling_policy_configuration {
     adjustment_type         = "ChangeInCapacity"
@@ -315,7 +319,7 @@ resource "aws_appautoscaling_policy" "down" {
 
     step_adjustment {
       metric_interval_lower_bound = 0
-      scaling_adjustment = -1
+      scaling_adjustment          = -1
     }
   }
 

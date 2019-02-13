@@ -1,12 +1,12 @@
 resource "aws_s3_bucket" "source" {
-  bucket        = "openjobs-experiment-source"
+  /* must be configured */
+  bucket        = "<MY-OWNER-S3-SOURCE>"
   acl           = "private"
   force_destroy = true
 }
 
 resource "aws_iam_role" "codepipeline_role" {
   name               = "codepipeline-role"
-
   assume_role_policy = "${file("${path.module}/policies/codepipeline_role.json")}"
 }
 
@@ -42,9 +42,9 @@ data "template_file" "codebuild_policy" {
 }
 
 resource "aws_iam_role_policy" "codebuild_policy" {
-  name        = "codebuild-policy"
-  role        = "${aws_iam_role.codebuild_role.id}"
-  policy      = "${data.template_file.codebuild_policy.rendered}"
+  name   = "codebuild-policy"
+  role   = "${aws_iam_role.codebuild_role.id}"
+  policy = "${data.template_file.codebuild_policy.rendered}"
 }
 
 data "template_file" "buildspec" {
@@ -59,7 +59,6 @@ data "template_file" "buildspec" {
   }
 }
 
-
 resource "aws_codebuild_project" "openjobs_build" {
   name          = "openjobs-codebuild"
   build_timeout = "10"
@@ -70,7 +69,8 @@ resource "aws_codebuild_project" "openjobs_build" {
   }
 
   environment {
-    compute_type    = "BUILD_GENERAL1_SMALL"
+    compute_type = "BUILD_GENERAL1_SMALL"
+
     // https://docs.aws.amazon.com/codebuild/latest/userguide/build-env-ref-available.html
     image           = "aws/codebuild/docker:1.12.1"
     type            = "LINUX_CONTAINER"
@@ -105,10 +105,14 @@ resource "aws_codepipeline" "pipeline" {
       version          = "1"
       output_artifacts = ["source"]
 
+      /* must be configured */
       configuration {
-        Owner      = "duduribeiro"
-        Repo       = "openjobs_experiment"
-        Branch     = "master"
+        Owner  = "<YOUR_USER_GITHUB>"
+        Repo   = "<YOUR_REPO_GITHUB>"
+        Branch = "<YOUR_BRANCH_GITHUB>"
+
+        // https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/
+        OAuthToken = "<YOUR_TOKEN_GITHUB>"
       }
     }
   }
